@@ -1,8 +1,7 @@
-.DS_Store
-*.pdb
 bin/
 obj/
-.DS_Store
+.vs/
+*.cache
+*.dll
 *.pdb
-bin/
-obj/
+*.json
