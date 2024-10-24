@@ -1,17 +1,17 @@
 {
   "format": 1,
   "restore": {
-    "/Users/moritz.wagner/Documents/C#DevTest_v4/WebProjectTest/WebProjectTest.csproj": {}
+    "/Users/moritz.wagner/Documents/C#DevTest_v5/WebProjectTest/WebProjectTest.csproj": {}
   },
   "projects": {
-    "/Users/moritz.wagner/Documents/C#DevTest_v4/WebProjectTest/WebProjectTest.csproj": {
+    "/Users/moritz.wagner/Documents/C#DevTest_v5/WebProjectTest/WebProjectTest.csproj": {
       "version": "1.0.0",
       "restore": {
-        "projectUniqueName": "/Users/moritz.wagner/Documents/C#DevTest_v4/WebProjectTest/WebProjectTest.csproj",
+        "projectUniqueName": "/Users/moritz.wagner/Documents/C#DevTest_v5/WebProjectTest/WebProjectTest.csproj",
         "projectName": "WebProjectTest",
-        "projectPath": "/Users/moritz.wagner/Documents/C#DevTest_v4/WebProjectTest/WebProjectTest.csproj",
+        "projectPath": "/Users/moritz.wagner/Documents/C#DevTest_v5/WebProjectTest/WebProjectTest.csproj",
         "packagesPath": "/Users/moritz.wagner/.nuget/packages/",
-        "outputPath": "/Users/moritz.wagner/Documents/C#DevTest_v4/WebProjectTest/obj/",
+        "outputPath": "/Users/moritz.wagner/Documents/C#DevTest_v5/WebProjectTest/obj/",
         "projectStyle": "PackageReference",
         "configFilePaths": [
           "/Users/moritz.wagner/.nuget/NuGet/NuGet.Config"

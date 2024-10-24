@@ -40,20 +40,41 @@ body {
 
 /* Modern Navigation */
 .navbar {
-  padding: 2rem 0;
-  background-color: rgba(255, 255, 255, 0.95) !important;
-  border-bottom: none;
+  background-image: url('../images/bonnier_header.jpg');
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  height: 120px; /* Adjust this value to control the navbar height */
+  position: fixed;
+  width: 100%;
+  top: 0;
+}
+
+.navbar .container {
+  position: relative;
+  z-index: 1;
+}
+
+.navbar-logo {
+  height: 40px; /* Adjust this value based on your needs */
+  background-color: rgba(255, 255, 255, 0.8); /* White with 80% opacity - adjust the 0.8 value to change transparency */
+  width: auto;
+  object-fit: contain;
 }
 
 .navbar .nav-link {
-  color: var(--bonnier-dark) !important;
-  font-weight: 500;
-  padding: 0.5rem 1rem !important;
-  transition: color 0.2s ease;
+  background-color: rgba(255, 255, 255, 0.7); /* White with 80% opacity - adjust the 0.8 value to change transparency */
+  border-radius: 6px; /* Rounded corners - adjust or remove as needed */
+  margin: 0 5px; /* Space between buttons */
+  padding: 8px 15px; /* Inner padding of buttons */
+  transition: all 0.3s ease; /* Smooth transition for hover effects */
+  font-size: 1.2rem;  /* This is new - adjust the value as needed */
+  font-weight: 500; 
 }
 
 .navbar .nav-link:hover {
-  color: var(--bonnier-accent) !important;
+  background-color: rgba(255, 255, 255, 0.9); /* Slightly more opaque on hover */
+  color: #000000; /* Text color on hover */
 }
 
 .navbar-brand {
