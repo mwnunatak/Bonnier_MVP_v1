@@ -58,23 +58,34 @@ public async Task<IActionResult> InitiateEmailChange(int autCode, string current
         _context.bon_db_verificationcodes.Add(verificationEntry);
         await _context.SaveChangesAsync();
 
-        // Send verification email
-        await _emailService.SendVerificationEmailAsync(newEmail, verificationCode);
-
-        // Return JSON response with needed data for modal
-        return Json(new { 
-            success = true, 
-            message = "Verifizierungscode wurde gesendet.",
-            newEmail = newEmail,
-            currentEmail = currentEmail
-        });
+        try
+        {
+            // Send verification email
+            await _emailService.SendVerificationEmailAsync(newEmail, verificationCode);
+            
+            // Return JSON response with needed data for modal
+            return Json(new { 
+                success = true, 
+                message = "Verifizierungscode wurde erneut gesendet.",
+                newEmail = newEmail,
+                currentEmail = currentEmail
+            });
+        }
+        catch (Exception emailEx)
+        {
+            _logger.LogError($"Error sending verification email: {emailEx.Message}");
+            return Json(new { 
+                success = false, 
+                message = "Fehler beim Senden des Verifizierungscodes per E-Mail."
+            });
+        }
     }
     catch (Exception ex)
     {
         _logger.LogError($"Error initiating email change: {ex.Message}");
         return Json(new { 
             success = false, 
-            message = "Fehler beim Senden des Verifizierungscodes."
+            message = "Fehler beim Initiieren der E-Mail-Änderung."
         });
     }
 }
@@ -168,8 +179,27 @@ public async Task<IActionResult> VerifyNewEmail(string newEmail, string currentE
 [HttpGet]
 public IActionResult VerifyCode(string? autCode = null)
 {
-    var isAuthenticated = HttpContext.Session.GetBool(AuthenticationSessionKey) ?? false;
+    // Clear session when accessing the page fresh
+    if (string.IsNullOrEmpty(autCode))
+    {
+        HttpContext.Session.Clear();
+    }
 
+    var isAuthenticated = HttpContext.Session.GetBool(AuthenticationSessionKey) ?? false;
+    
+    _logger.LogInformation($"VerifyCode called - autCode: {autCode}, isAuthenticated: {isAuthenticated}");
+
+    // If there's no autCode and not authenticated, show initial form
+    if (string.IsNullOrEmpty(autCode) && !isAuthenticated)
+    {
+        return View(new VerifyCodeViewModel 
+        { 
+            IsAuthenticated = false,
+            IsAwaitingVerification = false
+        });
+    }
+
+    // If there's an autCode, try to find the mailing entry
     if (!string.IsNullOrEmpty(autCode) && int.TryParse(autCode, out int codeValue))
     {
         var mailingEntry = _context.BonDbMailing
@@ -186,12 +216,19 @@ public IActionResult VerifyCode(string? autCode = null)
                 IsAuthenticated = isAuthenticated,
                 AutCode = codeValue,
                 Email = mailingEntry.Honempfmail,
-                Contacts = contacts
+                Contacts = contacts,
+                IsAwaitingVerification = false
             });
         }
     }
 
-    return View(new VerifyCodeViewModel { IsAuthenticated = isAuthenticated });
+    // If we get here, either autCode was invalid or not found
+    ViewData["NotFound"] = true;
+    return View(new VerifyCodeViewModel 
+    { 
+        IsAuthenticated = false,
+        IsAwaitingVerification = false
+    });
 }
 
 [HttpPost]
@@ -204,7 +241,7 @@ public IActionResult VerifyCodeSubmit(string autCode)
         if (string.IsNullOrEmpty(autCode) || !int.TryParse(autCode, out int codeValue))
         {
             ViewData["NotFound"] = true;
-            return View(new VerifyCodeViewModel());
+            return View("VerifyCode", new VerifyCodeViewModel());
         }
 
         // Find the mailing entry with the provided auth code
@@ -214,7 +251,7 @@ public IActionResult VerifyCodeSubmit(string autCode)
         if (mailingEntry == null)
         {
             ViewData["NotFound"] = true;
-            return View(new VerifyCodeViewModel());
+            return View("VerifyCode", new VerifyCodeViewModel());
         }
 
         // Find all contacts with matching email
@@ -224,13 +261,15 @@ public IActionResult VerifyCodeSubmit(string autCode)
 
         // Set authentication status
         SetAuthenticationStatus(true);
+        HttpContext.Session.SetString("LastAutCode", autCode);
 
         var viewModel = new VerifyCodeViewModel
         {
             AutCode = codeValue,
             Email = mailingEntry.Honempfmail,
             Contacts = contacts,
-            IsAuthenticated = true
+            IsAuthenticated = true,
+            IsAwaitingVerification = false
         };
 
         return View("VerifyCode", viewModel);

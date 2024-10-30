@@ -46,11 +46,14 @@ builder.Services.AddScoped<IEmailService>(sp =>
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
     options.UseSqlServer(connectionString));
 
+//Configure Session
 builder.Services.AddSession(options =>
 {
     options.IdleTimeout = TimeSpan.FromMinutes(30);
     options.Cookie.HttpOnly = true;
     options.Cookie.IsEssential = true;
+    options.Cookie.SecurePolicy = CookieSecurePolicy.Always; // Add this line
+    options.Cookie.SameSite = SameSiteMode.Lax; // Add this line
 });
 
 

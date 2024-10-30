@@ -1,5 +1,9 @@
 @model BonPortalBackend.Models.VerifyCodeViewModel
 
+@{
+    ViewData["Title"] = "Verify Code";
+}
+
 <div class="verification-container">
     @if (TempData["SuccessMessage"] != null)
     {
@@ -79,23 +83,11 @@
     <strong>Hinterlegte E-Mail Adresse:</strong> 
     <span class="d-inline-flex align-items-center">@Model.Email</span>
 </p>
-                        @if (Model.Contacts?.Any() == true)
-                        {
-                            <h4 class="mb-3">Sie erhalten die Abrechnungen für:</h4>
-                            <ul class="list-unstyled">
-                                @foreach (var contact in Model.Contacts)
-                                {
-                                    <li class="mb-2">@contact.VtgP_Name</li>
-                                }
-                            </ul>
-                            <form asp-controller="ContactInformation" asp-action="SaveOptIn" method="post" id="emailChangeForm" class="mt-4">
-    <input type="hidden" name="autCode" value="@Model.AutCode" />
-    <input type="hidden" name="email" value="@Model.Email" />
-                                
-                                <!-- New Email Change Section -->
+
+<!-- E-MAIL CHANGING SECTION -->
 <div class="mb-4">
     <button type="button" class="btn btn-link text-muted p-0" onclick="toggleEmailChange()">
-        <small>E-Mail-Adresse ändern</small>
+        <small>E-Mail Adresse ändern</small>
     </button>
     
     <div id="emailChangeSection" style="display: none;" class="mt-3">
@@ -115,7 +107,21 @@
     </div>
 </div>
 
-                                <!-- Opt-in Checkbox -->
+                        @if (Model.Contacts?.Any() == true)
+                        {
+                            <h4 class="mb-3">Sie erhalten die Abrechnungen für:</h4>
+                            <ul class="list-unstyled">
+                                @foreach (var contact in Model.Contacts)
+                                {
+                                    <li class="mb-2">@contact.VtgP_Name</li>
+                                }
+                            </ul>
+                            <form asp-controller="ContactInformation" asp-action="SaveOptIn" method="post" id="emailChangeForm" class="mt-4">
+    <input type="hidden" name="autCode" value="@Model.AutCode" />
+    <input type="hidden" name="email" value="@Model.Email" />
+                            
+
+<!-- OPT-IN CHECKBOX -->
     <div class="form-check mb-4 p-3 ps-5" style="background-color: #e8f5e9; border: 1px solid #c8e6c9; border-radius: 4px;">
         <input class="form-check-input ms-n4"
                type="checkbox"
@@ -210,17 +216,18 @@
             document.getElementById('timerDisplay').textContent = secondsRemaining;
         }
 
-        async function resendVerificationCode(event) {
-        event.preventDefault();
-        const resendButton = document.getElementById('resendCodeBtn');
-        const verificationError = document.getElementById('verificationError');
-    
-        try {
+        async function resendVerificationCode() {
+    const resendButton = document.getElementById('resendCodeBtn');
+    const verificationError = document.getElementById('verificationError');
+
+    try {
         resendButton.disabled = true;
         
         const currentEmail = document.getElementById('modalCurrentEmail').value;
         const newEmail = document.getElementById('modalNewEmail').value;
         const autCode = document.getElementById('modalAutCode').value;
+        
+        console.log('Resending code for:', {currentEmail, newEmail, autCode}); // For debugging
         
         const formData = new FormData();
         formData.append('autCode', autCode);
@@ -258,31 +265,37 @@
             verificationError.style.display = 'block';
             resendButton.disabled = false;
         }
-        } catch (error) {
+    } catch (error) {
         console.error('Error:', error);
         verificationError.textContent = 'Ein Fehler ist aufgetreten. Bitte versuchen Sie es später erneut.';
         verificationError.style.display = 'block';
         resendButton.disabled = false;
-        }
     }
+}
 
-    function startTimer() {
-    let secondsRemaining = 20;
+function startTimer() {
     const resendBtn = document.getElementById('resendCodeBtn');
     const timerDisplay = document.getElementById('timerDisplay');
+    let secondsRemaining = 20;
+    
+    // Clear any existing interval
+    if (timerInterval) {
+        clearInterval(timerInterval);
+    }
     
     resendBtn.disabled = true;
+    timerDisplay.textContent = secondsRemaining;
     
-    const timer = setInterval(() => {
+    timerInterval = setInterval(() => {
         secondsRemaining--;
         timerDisplay.textContent = secondsRemaining;
         
         if (secondsRemaining <= 0) {
-            clearInterval(timer);
+            clearInterval(timerInterval);
             resendBtn.disabled = false;
         }
     }, 1000);
-    }
+}
 
         // Handle successful verification
         function handleSuccessfulVerification(email) {
@@ -471,25 +484,21 @@ function toggleEmailChange() {
 
 document.getElementById('emailChangeForm')?.addEventListener('submit', async function(e) {
     e.preventDefault();
-    console.log('Form submission triggered'); // Debug log
     
     const form = e.target;
     const submitButton = form.querySelector('button[type="submit"]');
-    console.log('Submit button found:', submitButton); // Debug log
     
     submitButton.disabled = true;
     
     try {
         const formData = new FormData(form);
         const optInCheckbox = document.getElementById('optIn');
-        console.log('Opt-in checked:', optInCheckbox.checked); // Debug log
         
         // Ensure opt-in value is included in formData
         formData.set('optIn', optInCheckbox.checked);
         
         // Log the URL we're posting to
         const url = '@Url.Action("SaveOptIn", "ContactInformation")';
-        console.log('Posting to URL:', url); // Debug log
         
         const response = await fetch(url, {
             method: 'POST',
@@ -497,7 +506,6 @@ document.getElementById('emailChangeForm')?.addEventListener('submit', async fun
         });
         
         const data = await response.json();
-        console.log('Response received:', data); // Debug log
         
         if (data.success) {
             // Show success message
@@ -538,7 +546,6 @@ document.getElementById('emailChangeForm')?.addEventListener('submit', async fun
             submitButton.disabled = false;
         }
     } catch (error) {
-        console.error('Error during form submission:', error); // Enhanced error logging
         const errorAlert = document.createElement('div');
         errorAlert.className = 'alert alert-danger alert-dismissible fade show';
         errorAlert.innerHTML = `
@@ -619,23 +626,19 @@ document.addEventListener('DOMContentLoaded', function() {
     if (emailChangeForm) {
         emailChangeForm.addEventListener('submit', async function(e) {
             e.preventDefault();
-            console.log('Form submission triggered');
             
             const form = e.target;
             const submitButton = form.querySelector('button[type="submit"]');
-            console.log('Submit button found:', submitButton);
             
             submitButton.disabled = true;
             
             try {
                 const formData = new FormData(form);
                 const optInCheckbox = document.getElementById('optIn');
-                console.log('Opt-in checked:', optInCheckbox.checked);
                 
                 formData.set('optIn', optInCheckbox.checked);
                 
                 const url = '@Url.Action("SaveOptIn", "ContactInformation")';
-                console.log('Posting to URL:', url);
                 
                 const response = await fetch(url, {
                     method: 'POST',
@@ -643,7 +646,6 @@ document.addEventListener('DOMContentLoaded', function() {
                 });
                 
                 const data = await response.json();
-                console.log('Response received:', data);
                 
                 if (data.success) {
                     // Success message and thank you screen
@@ -671,7 +673,6 @@ document.addEventListener('DOMContentLoaded', function() {
                     submitButton.disabled = false;
                 }
             } catch (error) {
-                console.error('Error during form submission:', error);
                 const errorAlert = document.createElement('div');
                 errorAlert.className = 'alert alert-danger alert-dismissible fade show';
                 errorAlert.innerHTML = `
