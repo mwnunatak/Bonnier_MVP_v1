@@ -1,0 +1,688 @@
+@model BonPortalBackend.Models.VerifyCodeViewModel
+
+<div class="verification-container">
+    @if (TempData["SuccessMessage"] != null)
+    {
+        <div class="alert alert-success alert-dismissible fade show" role="alert">
+            @TempData["SuccessMessage"]
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+    }
+    @if (TempData["ErrorMessage"] != null)
+    {
+        <div class="alert alert-danger alert-dismissible fade show" role="alert">
+            @TempData["ErrorMessage"]
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+    }
+    
+    <div class="verification-form">
+        @if (!Model.IsAuthenticated && !Model.IsAwaitingVerification)
+        {
+            <h2 class="verification-title">Authentifizierung zum digitalen Abrechnungsversand</h2>
+            
+            <form asp-controller="ContactInformation" asp-action="VerifyCodeSubmit" method="post">
+                <div class="form-group">
+                    <label for="autCode" class="form-label">Geben Sie den Authentifizierungscode aus der E-Mail / Brief ein:</label>
+                    <input type="number"
+                           class="form-control verification-input"
+                           id="autCode"
+                           name="autCode"
+                           required
+                           min="0"
+                           max="999999" />
+                </div>
+                <button type="submit" class="btn btn-primary mt-4">Bestätigen</button>
+            </form>
+        }
+
+        @if (Model.IsAwaitingVerification)
+        {
+            <div class="card mt-4">
+                <div class="card-body">
+                    <h4>Verifizierung der neuen E-Mail-Adresse</h4>
+                    <p class="text-muted">Ein Verifizierungscode wurde an @Model.NewEmail gesendet.</p>
+                    <form asp-controller="ContactInformation" asp-action="VerifyNewEmail" method="post">
+                        <input type="hidden" name="newEmail" value="@Model.NewEmail" />
+                        <input type="hidden" name="currentEmail" value="@Model.Email" />
+                        <input type="hidden" name="autCode" value="@Model.AutCode" />
+                        <div class="form-group">
+                            <label for="verificationCode">Verifizierungscode eingeben:</label>
+                            <input type="text" 
+       class="form-control" 
+       id="verificationCode" 
+       name="verificationCode" 
+       required 
+       pattern="\d{6}"
+       maxlength="6"
+       placeholder="6-stelliger Code" />
+                        </div>
+                        <button type="submit" class="btn btn-primary mt-3">E-Mail verifizieren</button>
+                    </form>
+                </div>
+            </div>
+        }
+
+        @if (ViewData["NotFound"] != null)
+        {
+            <div class="alert alert-danger mt-4" role="alert">
+                Authentifizierungscode wurde nicht gefunden
+            </div>
+        }
+        else if (Model.AutCode.HasValue)
+        {
+            <div class="mt-5">
+                <h3 class="mb-4">Die Authentifizierung war erfolgreich:</h3>
+                <div class="card">
+                    <div class="card-body">
+                        <p class="mb-3">
+    <strong>Hinterlegte E-Mail Adresse:</strong> 
+    <span class="d-inline-flex align-items-center">@Model.Email</span>
+</p>
+                        @if (Model.Contacts?.Any() == true)
+                        {
+                            <h4 class="mb-3">Sie erhalten die Abrechnungen für:</h4>
+                            <ul class="list-unstyled">
+                                @foreach (var contact in Model.Contacts)
+                                {
+                                    <li class="mb-2">@contact.VtgP_Name</li>
+                                }
+                            </ul>
+                            <form asp-controller="ContactInformation" asp-action="SaveOptIn" method="post" id="emailChangeForm" class="mt-4">
+    <input type="hidden" name="autCode" value="@Model.AutCode" />
+    <input type="hidden" name="email" value="@Model.Email" />
+                                
+                                <!-- New Email Change Section -->
+<div class="mb-4">
+    <button type="button" class="btn btn-link text-muted p-0" onclick="toggleEmailChange()">
+        <small>E-Mail-Adresse ändern</small>
+    </button>
+    
+    <div id="emailChangeSection" style="display: none;" class="mt-3">
+        <div class="form-group mb-3">
+            <label for="newEmail">Neue E-Mail-Adresse:</label>
+            <input type="email" class="form-control" id="newEmail" name="newEmail" />
+        </div>
+        <button type="button" class="btn btn-primary" id="requestVerificationButton" onclick="initiateEmailChange()">
+            <span class="normal-state">
+                Verifizierungscode anfordern
+            </span>
+            <span class="loading-state" style="display: none;">
+                <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                Code wird gesendet...
+            </span>
+        </button>
+    </div>
+</div>
+
+                                <!-- Opt-in Checkbox -->
+    <div class="form-check mb-4 p-3 ps-5" style="background-color: #e8f5e9; border: 1px solid #c8e6c9; border-radius: 4px;">
+        <input class="form-check-input ms-n4"
+               type="checkbox"
+               id="optIn"
+               name="optIn"
+               value="true"
+               onchange="updateSaveButton()"
+               @(Model.Contacts?.Any(c => c.Honempf_Opt_In == "TRUE") == true ? "checked" : "")>
+        <label class="form-check-label" for="optIn">
+            <strong>Die Abrechnungen für die oben genannten Personen möchte ich in Zukunft digital erhalten.</strong>
+        </label>
+    </div>
+
+                                <!-- Environmental message -->
+                                <div id="environmentalMessage" class="alert mb-3" 
+                                     style="display: none; background-color: #f5f9f5; border: 1px solid #c8e6c9; color: #2e7d32;">
+                                    Bitte wählen Sie den digitalen Versand aus, um einen nachhaltig positiven Einfluss auf die Umwelt zu nehmen.
+                                </div>
+
+                                <button type="submit" id="saveButton" class="btn btn-primary" disabled>Einstellungen speichern</button>
+                            </form>
+                        }
+                    </div>
+                </div>
+            </div>
+        }
+    </div>
+</div>
+
+<!-- Email Verification Modal -->
+<div class="modal fade" id="emailVerificationModal" tabindex="-1" aria-labelledby="emailVerificationModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="emailVerificationModalLabel">E-Mail Verifizierung</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="verification-status-message mb-3">
+                </div>
+
+                <form id="verificationForm" onsubmit="submitVerificationCode(event)">
+                    <input type="hidden" name="newEmail" id="modalNewEmail" value="@Model.NewEmail" />
+                    <input type="hidden" name="currentEmail" id="modalCurrentEmail" value="@Model.Email" />
+                    <input type="hidden" name="autCode" id="modalAutCode" value="@Model.AutCode" />
+                    
+                    <div class="form-group mb-3">
+                        <label for="verificationCode" class="form-label">Verifizierungscode:</label>
+                        <input type="text" 
+                               class="form-control" 
+                               id="verificationCode" 
+                               name="verificationCode" 
+                               required 
+                               pattern="\d{6}"
+                               maxlength="6"
+                               placeholder="6-stelliger Code" />
+                    </div>
+                    <div id="verificationError" class="alert alert-danger" style="display: none;"></div>
+
+                    <div class="d-flex justify-content-between align-items-center">
+                        <button type="submit" class="btn btn-primary">Bestätigen</button>
+                        
+                        <div id="resendCodeSection">
+                            <button type="button" 
+                                    id="resendCodeBtn" 
+                                    class="btn btn-link" 
+                                    onclick="resendVerificationCode()"
+                                    disabled>
+                                Code erneut senden (<span id="timerDisplay">20</span>s)
+                            </button>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Success Check Mark Template -->
+<template id="successCheckmark">
+    <span class="text-success">
+        <i class="bi bi-check-circle-fill"></i>
+    </span>
+</template>
+
+@section Scripts {
+    <script>
+        let timerInterval;
+        let secondsRemaining = 20;
+
+        function updateTimerDisplay() {
+            document.getElementById('timerDisplay').textContent = secondsRemaining;
+        }
+
+        async function resendVerificationCode(event) {
+        event.preventDefault();
+        const resendButton = document.getElementById('resendCodeBtn');
+        const verificationError = document.getElementById('verificationError');
+    
+        try {
+        resendButton.disabled = true;
+        
+        const currentEmail = document.getElementById('modalCurrentEmail').value;
+        const newEmail = document.getElementById('modalNewEmail').value;
+        const autCode = document.getElementById('modalAutCode').value;
+        
+        const formData = new FormData();
+        formData.append('autCode', autCode);
+        formData.append('currentEmail', currentEmail);
+        formData.append('newEmail', newEmail);
+        
+        const response = await fetch('@Url.Action("InitiateEmailChange", "ContactInformation")', {
+            method: 'POST',
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest'
+            },
+            body: formData
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            // Hide any existing error
+            verificationError.style.display = 'none';
+            
+            // Update status message
+            document.querySelector('.verification-status-message').innerHTML = `
+                <div class="alert alert-info">
+                    Ein neuer Verifizierungscode wurde an ${data.newEmail} gesendet.
+                </div>
+            `;
+            
+            // Reset verification code input
+            document.getElementById('verificationCode').value = '';
+            
+            // Start new timer
+            startTimer();
+        } else {
+            verificationError.textContent = data.message || 'Fehler beim Senden des Codes';
+            verificationError.style.display = 'block';
+            resendButton.disabled = false;
+        }
+        } catch (error) {
+        console.error('Error:', error);
+        verificationError.textContent = 'Ein Fehler ist aufgetreten. Bitte versuchen Sie es später erneut.';
+        verificationError.style.display = 'block';
+        resendButton.disabled = false;
+        }
+    }
+
+    function startTimer() {
+    let secondsRemaining = 20;
+    const resendBtn = document.getElementById('resendCodeBtn');
+    const timerDisplay = document.getElementById('timerDisplay');
+    
+    resendBtn.disabled = true;
+    
+    const timer = setInterval(() => {
+        secondsRemaining--;
+        timerDisplay.textContent = secondsRemaining;
+        
+        if (secondsRemaining <= 0) {
+            clearInterval(timer);
+            resendBtn.disabled = false;
+        }
+    }, 1000);
+    }
+
+        // Handle successful verification
+        function handleSuccessfulVerification(email) {
+            const checkmarkTemplate = document.getElementById('successCheckmark');
+            const emailElement = document.querySelector(`[data-email="${email}"]`);
+            
+            if (emailElement && checkmarkTemplate) {
+                const checkmark = checkmarkTemplate.content.cloneNode(true);
+                emailElement.appendChild(checkmark);
+            }
+            
+            $('#emailVerificationModal').modal('hide');
+        }
+
+        // Initialize modal and timer when shown
+        document.addEventListener('DOMContentLoaded', () => {
+            const verificationModal = document.getElementById('emailVerificationModal');
+            if (verificationModal) {
+                verificationModal.addEventListener('shown.bs.modal', () => {
+                    startTimer();
+                });
+
+                verificationModal.addEventListener('hidden.bs.modal', () => {
+                    clearInterval(timerInterval);
+                });
+            }
+        });
+    </script>
+}
+
+<script>
+function addVerifiedEmailDisplay(newEmail) {
+    // Find the container where the new email should be displayed
+    const emailContainer = document.querySelector('.card-body');
+    
+    // Check if new email display already exists and remove it if it does
+    const existingNewEmail = document.querySelector('.new-email-container');
+    if (existingNewEmail) {
+        existingNewEmail.remove();
+    }
+
+    // Create new email display
+    const newEmailDiv = document.createElement('div');
+    newEmailDiv.className = 'new-email-container mt-4';
+    newEmailDiv.innerHTML = `
+        <p class="mb-3">
+            <strong>Neue E-Mail für Abrechnungen:</strong>
+            <span class="d-inline-flex align-items-center">
+                ${newEmail}
+                <span class="text-success ms-2">
+                    <i class="bi bi-check-circle-fill"></i>
+                </span>
+            </span>
+        </p>
+    `;
+    
+    // Insert after the current email display
+    const currentEmailElement = emailContainer.querySelector('p.mb-3');
+    currentEmailElement.parentNode.insertBefore(newEmailDiv, currentEmailElement.nextSibling);
+}
+
+async function initiateEmailChange() {
+    const button = document.getElementById('requestVerificationButton');
+    const normalState = button.querySelector('.normal-state');
+    const loadingState = button.querySelector('.loading-state');
+    
+    // Show loading state
+    button.disabled = true;
+    normalState.style.display = 'none';
+    loadingState.style.display = 'inline';
+
+    const newEmail = document.getElementById('newEmail').value;
+    const currentEmail = document.querySelector('input[name="currentEmail"]').value;
+    const autCode = document.querySelector('input[name="autCode"]').value;
+
+    const formData = new FormData();
+    formData.append('autCode', autCode);
+    formData.append('currentEmail', currentEmail);
+    formData.append('newEmail', newEmail);
+
+    try {
+        const response = await fetch('@Url.Action("InitiateEmailChange", "ContactInformation")', {
+            method: 'POST',
+            body: formData
+        });
+        const data = await response.json();
+
+        if (data.success) {
+            // Update modal content and hidden fields
+            document.querySelector('.verification-status-message').innerHTML = 
+                `<div class="alert alert-info">Ein Verifizierungscode wurde an ${data.newEmail} gesendet.</div>`;
+            
+            // Set hidden field values
+            document.getElementById('modalNewEmail').value = data.newEmail;
+            document.getElementById('modalCurrentEmail').value = data.currentEmail;
+            document.getElementById('modalAutCode').value = autCode;
+            
+            // Show modal
+            const verificationModal = new bootstrap.Modal(document.getElementById('emailVerificationModal'));
+            verificationModal.show();
+            
+            // Start timer
+            startTimer();
+        } else {
+            alert(data.message || 'Fehler beim Senden des Codes. Bitte versuchen Sie es später erneut.');
+        }
+    } catch (error) {
+        console.error('Error:', error);
+        alert('Ein Fehler ist aufgetreten. Bitte versuchen Sie es später erneut.');
+    } finally {
+        // Reset button state
+        button.disabled = false;
+        normalState.style.display = 'inline';
+        loadingState.style.display = 'none';
+    }
+}
+
+async function submitVerificationCode(event) {
+    event.preventDefault();
+    const form = event.target;
+    const formData = new FormData(form);
+    const verificationError = document.getElementById('verificationError');
+    const submitButton = form.querySelector('button[type="submit"]');
+    
+    try {
+        submitButton.disabled = true;
+        
+        const response = await fetch('@Url.Action("VerifyNewEmail", "ContactInformation")', {
+            method: 'POST',
+            body: formData
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            // Hide error message if it was shown
+            verificationError.style.display = 'none';
+            
+            // Close modal
+            const modal = bootstrap.Modal.getInstance(document.getElementById('emailVerificationModal'));
+            modal.hide();
+            
+            // Add the new verified email display
+            addVerifiedEmailDisplay(formData.get('newEmail'));
+            
+            // Show success message
+            const successAlert = document.createElement('div');
+            successAlert.className = 'alert alert-success alert-dismissible fade show';
+            successAlert.innerHTML = `
+                ${data.message}
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            `;
+            
+            // Insert success message at the top of the verification container
+            const container = document.querySelector('.verification-container');
+            container.insertBefore(successAlert, container.firstChild);
+            
+            // Reset and hide the email change form
+            const emailChangeSection = document.getElementById('emailChangeSection');
+            if (emailChangeSection) {
+                emailChangeSection.style.display = 'none';
+            }
+
+            // Update save button state - Add this line
+            updateSaveButton();
+            
+        } else {
+            // Show error message in modal
+            verificationError.textContent = data.message;
+            verificationError.style.display = 'block';
+            submitButton.disabled = false;
+        }
+    } catch (error) {
+        console.error('Error:', error);
+        verificationError.textContent = 'Ein Fehler ist aufgetreten. Bitte versuchen Sie es später erneut.';
+        verificationError.style.display = 'block';
+        submitButton.disabled = false;
+    }
+}
+
+
+function toggleEmailChange() {
+    const emailSection = document.getElementById('emailChangeSection');
+    emailSection.style.display = emailSection.style.display === 'none' ? 'block' : 'none';
+}
+
+document.getElementById('emailChangeForm')?.addEventListener('submit', async function(e) {
+    e.preventDefault();
+    console.log('Form submission triggered'); // Debug log
+    
+    const form = e.target;
+    const submitButton = form.querySelector('button[type="submit"]');
+    console.log('Submit button found:', submitButton); // Debug log
+    
+    submitButton.disabled = true;
+    
+    try {
+        const formData = new FormData(form);
+        const optInCheckbox = document.getElementById('optIn');
+        console.log('Opt-in checked:', optInCheckbox.checked); // Debug log
+        
+        // Ensure opt-in value is included in formData
+        formData.set('optIn', optInCheckbox.checked);
+        
+        // Log the URL we're posting to
+        const url = '@Url.Action("SaveOptIn", "ContactInformation")';
+        console.log('Posting to URL:', url); // Debug log
+        
+        const response = await fetch(url, {
+            method: 'POST',
+            body: formData
+        });
+        
+        const data = await response.json();
+        console.log('Response received:', data); // Debug log
+        
+        if (data.success) {
+            // Show success message
+            const successAlert = document.createElement('div');
+            successAlert.className = 'alert alert-success alert-dismissible fade show';
+            successAlert.innerHTML = `
+                ${data.message}
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            `;
+            
+            // Insert success message at the top
+            const container = document.querySelector('.verification-container');
+            container.insertBefore(successAlert, container.firstChild);
+            
+            // Always show thank you message on successful save
+            const cardBody = form.closest('.card-body');
+            if (cardBody) {
+                const thankYouDiv = document.createElement('div');
+                thankYouDiv.className = 'text-center py-4';
+                thankYouDiv.innerHTML = `
+                    <h4 class="mb-3">Vielen Dank!</h4>
+                    <p>Ihre Einstellungen wurden erfolgreich gespeichert.</p>
+                `;
+                
+                // Replace form with thank you message
+                cardBody.innerHTML = '';
+                cardBody.appendChild(thankYouDiv);
+            }
+        } else {
+            // Show error message
+            const errorAlert = document.createElement('div');
+            errorAlert.className = 'alert alert-danger alert-dismissible fade show';
+            errorAlert.innerHTML = `
+                ${data.message}
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            `;
+            form.insertBefore(errorAlert, form.firstChild);
+            submitButton.disabled = false;
+        }
+    } catch (error) {
+        console.error('Error during form submission:', error); // Enhanced error logging
+        const errorAlert = document.createElement('div');
+        errorAlert.className = 'alert alert-danger alert-dismissible fade show';
+        errorAlert.innerHTML = `
+            Ein Fehler ist aufgetreten. Bitte versuchen Sie es später erneut.
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        `;
+        form.insertBefore(errorAlert, form.firstChild);
+        submitButton.disabled = false;
+    }
+});
+
+function validateEmails() {
+    const newEmail = document.getElementById('newEmail').value;
+    const submitButton = document.getElementById('requestVerificationButton');
+    
+    // Enable button if email is not empty
+    submitButton.disabled = !newEmail;
+}
+
+function addCheckmarkToEmail(email) {
+    // Find the email display element - adjust the selector based on where the email is displayed
+    const emailElement = document.querySelector('.mb-3 strong');
+    if (emailElement) {
+        // Create checkmark icon
+        const checkmark = document.createElement('span');
+        checkmark.className = 'text-success ms-2';
+        checkmark.innerHTML = '<i class="bi bi-check-circle-fill"></i>';
+        
+        // Add the checkmark next to the email
+        emailElement.appendChild(checkmark);
+    }
+}
+
+function updateSaveButton() {
+    const optInCheckbox = document.getElementById('optIn');
+    const saveButton = document.getElementById('saveButton');
+    const envMessage = document.getElementById('environmentalMessage');
+    
+    if (optInCheckbox && saveButton) {
+        // Enable save button whenever opt-in is checked, disable when unchecked
+        if (optInCheckbox.checked) {
+            saveButton.classList.remove('btn-secondary');
+            saveButton.classList.add('btn-primary');
+            saveButton.disabled = false;  // Always enable when checked
+            if (envMessage) {
+                envMessage.style.display = 'none';
+            }
+        } else {
+            saveButton.classList.remove('btn-primary');
+            saveButton.classList.add('btn-secondary');
+            saveButton.disabled = true;
+            if (envMessage) {
+                envMessage.style.display = 'block';
+            }
+        }
+    }
+}
+
+// Event listeners
+document.addEventListener('DOMContentLoaded', function() {
+    // Initialize save button state
+    updateSaveButton();
+    
+    // Add change event listener to checkbox
+    const optInCheckbox = document.getElementById('optIn');
+    if (optInCheckbox) {
+        optInCheckbox.addEventListener('change', updateSaveButton);
+    }
+    
+    // Add input event listener to email field
+    const newEmailInput = document.getElementById('newEmail');
+    if (newEmailInput) {
+        newEmailInput.addEventListener('input', validateEmails);
+    }
+    
+    // Add submit event listener to form
+    const emailChangeForm = document.getElementById('emailChangeForm');
+    if (emailChangeForm) {
+        emailChangeForm.addEventListener('submit', async function(e) {
+            e.preventDefault();
+            console.log('Form submission triggered');
+            
+            const form = e.target;
+            const submitButton = form.querySelector('button[type="submit"]');
+            console.log('Submit button found:', submitButton);
+            
+            submitButton.disabled = true;
+            
+            try {
+                const formData = new FormData(form);
+                const optInCheckbox = document.getElementById('optIn');
+                console.log('Opt-in checked:', optInCheckbox.checked);
+                
+                formData.set('optIn', optInCheckbox.checked);
+                
+                const url = '@Url.Action("SaveOptIn", "ContactInformation")';
+                console.log('Posting to URL:', url);
+                
+                const response = await fetch(url, {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                const data = await response.json();
+                console.log('Response received:', data);
+                
+                if (data.success) {
+                    // Success message and thank you screen
+                    const cardBody = form.closest('.card-body');
+                    if (cardBody) {
+                        const thankYouDiv = document.createElement('div');
+                        thankYouDiv.className = 'text-center py-4';
+                        thankYouDiv.innerHTML = `
+                            <h4 class="mb-3">Vielen Dank!</h4>
+                            <p>Ihre Einstellungen wurden erfolgreich gespeichert.</p>
+                        `;
+                        
+                        cardBody.innerHTML = '';
+                        cardBody.appendChild(thankYouDiv);
+                    }
+                } else {
+                    // Error handling
+                    const errorAlert = document.createElement('div');
+                    errorAlert.className = 'alert alert-danger alert-dismissible fade show';
+                    errorAlert.innerHTML = `
+                        ${data.message}
+                        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                    `;
+                    form.insertBefore(errorAlert, form.firstChild);
+                    submitButton.disabled = false;
+                }
+            } catch (error) {
+                console.error('Error during form submission:', error);
+                const errorAlert = document.createElement('div');
+                errorAlert.className = 'alert alert-danger alert-dismissible fade show';
+                errorAlert.innerHTML = `
+                    Ein Fehler ist aufgetreten. Bitte versuchen Sie es später erneut.
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                `;
+                form.insertBefore(errorAlert, form.firstChild);
+                submitButton.disabled = false;
+            }
+        });
+    }
+});
+
+</script>

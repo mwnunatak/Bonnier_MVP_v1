@@ -1,0 +1,25 @@
+﻿@model ErrorViewModel
+@{
+    ViewData["Title"] = "Error";
+}
+
+@if (Model.IsDatabaseError)
+{
+    <div class="alert alert-danger">
+        <h2>Datenbankfehler</h2>
+        <p>Die Datenbank ist gerade nicht verfügbar, bitte laden Sie die Seite erneut und warten 10 Sekunden. 
+           Sollte der Fehler nochmal auftreten, dann wenden Sie sich bitte telefonisch an uns.</p>
+        <button class="btn btn-primary" onclick="window.location.reload();">Seite neu laden</button>
+    </div>
+}
+else
+{
+    <h1 class="text-danger">Error.</h1>
+    <h2 class="text-danger">An error occurred while processing your request.</h2>
+    @if (Model.ShowRequestId)
+    {
+        <p>
+            <strong>Request ID:</strong> <code>@Model.RequestId</code>
+        </p>
+    }
+}
