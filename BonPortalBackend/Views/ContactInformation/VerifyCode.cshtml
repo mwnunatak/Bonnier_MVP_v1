@@ -24,20 +24,81 @@
         @if (!Model.IsAuthenticated && !Model.IsAwaitingVerification)
         {
             <h2 class="verification-title">Authentifizierung zum digitalen Abrechnungsversand</h2>
-            
-            <form asp-controller="ContactInformation" asp-action="VerifyCodeSubmit" method="post">
+    
+            @if (ViewData["NotFound"] != null)
+            {
+                <div class="alert alert-danger mt-4" role="alert">
+                Authentifizierungscode wurde nicht gefunden: @ViewData["PrefilledCode"]
+                </div>
+            }
+    
+            <form asp-controller="ContactInformation" asp-action="VerifyCodeSubmit" method="post" id="verificationForm">
                 <div class="form-group">
                     <label for="autCode" class="form-label">Geben Sie den Authentifizierungscode aus der E-Mail / Brief ein:</label>
-                    <input type="number"
-                           class="form-control verification-input"
-                           id="autCode"
-                           name="autCode"
-                           required
-                           min="0"
-                           max="999999" />
+                    <input type="text"
+                        class="form-control verification-input"
+                        id="autCode"
+                        name="autCode"
+                        required
+                        pattern="[A-Z0-9]{4}-[A-Z0-9]{4}-[A-Z0-9]{4}"
+                        placeholder="XXXX-XXXX-XXXX"
+                        style="text-transform: uppercase;"
+                        maxlength="14"
+                   v        alue="@ViewData["PrefilledCode"]" />
                 </div>
                 <button type="submit" class="btn btn-primary mt-4">Bestätigen</button>
             </form>
+
+        @if (!string.IsNullOrEmpty(ViewData["PrefilledCode"]?.ToString()))
+        {
+            <div class="mt-3 text-muted">
+                <small>Auto-submitted code: @ViewData["PrefilledCode"]</small>
+            </div>
+        }
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() 
+        {
+            const form = document.getElementById('verificationForm');
+            const isAuthenticated = @Json.Serialize(Model.IsAuthenticated);
+            const prefilledCode = '@ViewData["PrefilledCode"]';
+            
+            // Only auto-submit if we have a prefilled code and are not authenticated
+            if (form && !isAuthenticated && prefilledCode) 
+            {
+                // Remove the code from URL after submission to prevent loops
+                form.addEventListener('submit', function() 
+                    {
+                    if (window.history && window.history.replaceState) {
+                        const newUrl = window.location.pathname;
+                        window.history.replaceState({}, document.title, newUrl);
+                    }
+                });
+                
+                form.submit();
+            }
+        });
+    </script>
+
+<script>
+document.getElementById('autCode')?.addEventListener('input', function(e) {
+    let code = e.target.value.replace(/[^A-Z0-9]/gi, '').toUpperCase();
+    
+    if (code.length > 4) {
+        code = code.slice(0, 4) + '-' + code.slice(4);
+    }
+    if (code.length > 9) {
+        code = code.slice(0, 9) + '-' + code.slice(9);
+    }
+    if (code.length > 14) {
+        code = code.slice(0, 14);
+    }
+    
+    e.target.value = code;
+});
+</script>
+
+
         }
 
         @if (Model.IsAwaitingVerification)
@@ -73,7 +134,7 @@
                 Authentifizierungscode wurde nicht gefunden
             </div>
         }
-        else if (Model.AutCode.HasValue)
+        else if (!string.IsNullOrEmpty(Model.AutCode))
         {
             <div class="mt-5">
                 <h3 class="mb-4">Die Authentifizierung war erfolgreich:</h3>

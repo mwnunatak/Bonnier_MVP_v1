@@ -177,56 +177,66 @@ public async Task<IActionResult> VerifyNewEmail(string newEmail, string currentE
 }
 
 [HttpGet]
-public IActionResult VerifyCode(string? autCode = null)
+public IActionResult VerifyCode(string? code = null, string? autCode = null)
 {
-    // Clear session when accessing the page fresh
-    if (string.IsNullOrEmpty(autCode))
-    {
-        HttpContext.Session.Clear();
-    }
+    // If code is provided in URL, use that as the autCode
+    string? verificationCode = code ?? autCode;
+    
+    _logger.LogInformation($"Initial verification code from URL: {verificationCode}");
 
     var isAuthenticated = HttpContext.Session.GetBool(AuthenticationSessionKey) ?? false;
     
-    _logger.LogInformation($"VerifyCode called - autCode: {autCode}, isAuthenticated: {isAuthenticated}");
-
-    // If there's no autCode and not authenticated, show initial form
-    if (string.IsNullOrEmpty(autCode) && !isAuthenticated)
+    // If there's a code in the URL, add it to ViewData for auto-fill
+    if (!string.IsNullOrEmpty(verificationCode))
     {
-        return View(new VerifyCodeViewModel 
-        { 
-            IsAuthenticated = false,
-            IsAwaitingVerification = false
-        });
-    }
+        // Format the code if it doesn't have dashes
+        if (!verificationCode.Contains("-") && verificationCode.Length == 12)
+        {
+            verificationCode = $"{verificationCode.Substring(0, 4)}-{verificationCode.Substring(4, 4)}-{verificationCode.Substring(8, 4)}";
+        }
+        ViewData["PrefilledCode"] = verificationCode;
+        _logger.LogInformation($"Formatted verification code: {verificationCode}");
 
-    // If there's an autCode, try to find the mailing entry
-    if (!string.IsNullOrEmpty(autCode) && int.TryParse(autCode, out int codeValue))
-    {
+        // Try to find the mailing entry
         var mailingEntry = _context.BonDbMailing
-            .FirstOrDefault(m => m.AutCode == codeValue);
+            .FirstOrDefault(m => m.AutCode == verificationCode);
 
+        _logger.LogInformation($"Database lookup result: {(mailingEntry != null ? "Found" : "Not Found")}");
         if (mailingEntry != null)
         {
+            _logger.LogInformation($"Found mailing entry with email: {mailingEntry.Honempfmail}");
+            
             var contacts = _context.BonDbContacts
                 .Where(c => c.Honempfemail == mailingEntry.Honempfmail)
                 .ToList();
 
+            _logger.LogInformation($"Found {contacts.Count} contacts");
+
             return View(new VerifyCodeViewModel 
             { 
-                IsAuthenticated = isAuthenticated,
-                AutCode = codeValue,
+                IsAuthenticated = true,
+                AutCode = verificationCode,
                 Email = mailingEntry.Honempfmail,
                 Contacts = contacts,
                 IsAwaitingVerification = false
             });
         }
+        else
+        {
+            // Log the actual database values for comparison
+            var allCodes = _context.BonDbMailing
+                .Select(m => m.AutCode)
+                .ToList();
+            _logger.LogInformation($"Available codes in database: {string.Join(", ", allCodes)}");
+            
+            ViewData["NotFound"] = true;
+            _logger.LogWarning($"No mailing entry found for code: {verificationCode}");
+        }
     }
 
-    // If we get here, either autCode was invalid or not found
-    ViewData["NotFound"] = true;
     return View(new VerifyCodeViewModel 
     { 
-        IsAuthenticated = false,
+        IsAuthenticated = isAuthenticated,
         IsAwaitingVerification = false
     });
 }
@@ -238,15 +248,18 @@ public IActionResult VerifyCodeSubmit(string autCode)
     {
         _logger.LogInformation($"Attempting to verify code: {autCode}");
 
-        if (string.IsNullOrEmpty(autCode) || !int.TryParse(autCode, out int codeValue))
+        if (string.IsNullOrEmpty(autCode))
         {
             ViewData["NotFound"] = true;
             return View("VerifyCode", new VerifyCodeViewModel());
         }
 
+        // Clean up the input code if needed (in case user enters without dashes)
+        var formattedCode = autCode.Replace(" ", "").Replace("-", "").Insert(4, "-").Insert(9, "-");
+
         // Find the mailing entry with the provided auth code
         var mailingEntry = _context.BonDbMailing
-            .FirstOrDefault(m => m.AutCode == codeValue);
+            .FirstOrDefault(m => m.AutCode == formattedCode);
 
         if (mailingEntry == null)
         {
@@ -261,11 +274,11 @@ public IActionResult VerifyCodeSubmit(string autCode)
 
         // Set authentication status
         SetAuthenticationStatus(true);
-        HttpContext.Session.SetString("LastAutCode", autCode);
+        HttpContext.Session.SetString("LastAutCode", formattedCode);
 
         var viewModel = new VerifyCodeViewModel
         {
-            AutCode = codeValue,
+            AutCode = formattedCode,
             Email = mailingEntry.Honempfmail,
             Contacts = contacts,
             IsAuthenticated = true,
