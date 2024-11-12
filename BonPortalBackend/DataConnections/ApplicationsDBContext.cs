@@ -23,8 +23,8 @@ namespace BonPortalBackend.Data
             }
         }
     public DbSet<ContactInformation> ContactInformation {get; set;}
-    public DbSet<BonDbMailing> BonDbMailing {get; set;}
-    public DbSet<BonDbContacts> BonDbContacts {get; set;}
+    public DbSet<BonDbMailing> bon_db_mailing {get; set;}
+    public DbSet<BonDbContacts> bon_db_contacts {get; set;}
     public DbSet<BonDbVerificationCodes> bon_db_verificationcodes { get; set; }
     }
 }

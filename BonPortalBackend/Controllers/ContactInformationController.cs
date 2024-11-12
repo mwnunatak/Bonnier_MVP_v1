@@ -147,15 +147,18 @@ public async Task<IActionResult> VerifyNewEmail(string newEmail, string currentE
         verificationEntry.Auth_Success = true;
         await _context.SaveChangesAsync();
 
-        // Update the email in contacts
-        var contacts = await _context.BonDbContacts
-            .Where(c => c.Honempfemail == currentEmail)
-            .ToListAsync();
+        // Update the email in contacts - check both email fields
+var contacts = await _context.bon_db_contacts
+    .Where(c => c.Honempfemail == currentEmail || c.Lzgemail == currentEmail)
+    .ToListAsync();
 
-        foreach (var contact in contacts)
-        {
-            contact.Honempfemail_NEU = verificationEntry.New_Mail;
-        }
+_logger.LogInformation($"Found {contacts.Count} contacts to update with new email");
+
+foreach (var contact in contacts)
+{
+    contact.Honempfemail_NEU = newEmail;  // Use newEmail directly since it's already verified
+    _logger.LogInformation($"Updating contact {contact.VtgP_Name} with new email: {newEmail}");
+}
 
         await _context.SaveChangesAsync();
         _logger.LogInformation($"Email verification completed successfully");
@@ -186,7 +189,14 @@ public IActionResult VerifyCode(string? code = null, string? autCode = null)
 
     var isAuthenticated = HttpContext.Session.GetBool(AuthenticationSessionKey) ?? false;
     
-    // If there's a code in the URL, add it to ViewData for auto-fill
+    // If already authenticated and no new code provided, try to get the last used code
+    if (isAuthenticated && string.IsNullOrEmpty(verificationCode))
+    {
+        verificationCode = HttpContext.Session.GetString("LastAutCode");
+        _logger.LogInformation($"Retrieved last auth code from session: {verificationCode}");
+    }
+
+    // If there's a code (either from URL or session), process it
     if (!string.IsNullOrEmpty(verificationCode))
     {
         // Format the code if it doesn't have dashes
@@ -198,25 +208,35 @@ public IActionResult VerifyCode(string? code = null, string? autCode = null)
         _logger.LogInformation($"Formatted verification code: {verificationCode}");
 
         // Try to find the mailing entry
-        var mailingEntry = _context.BonDbMailing
+        var mailingEntry = _context.bon_db_mailing
             .FirstOrDefault(m => m.AutCode == verificationCode);
 
         _logger.LogInformation($"Database lookup result: {(mailingEntry != null ? "Found" : "Not Found")}");
         if (mailingEntry != null)
-        {
-            _logger.LogInformation($"Found mailing entry with email: {mailingEntry.Honempfmail}");
-            
-            var contacts = _context.BonDbContacts
-                .Where(c => c.Honempfemail == mailingEntry.Honempfmail)
-                .ToList();
+{
+    _logger.LogInformation($"Found mailing entry with Lzgemail: {mailingEntry.Lzgemail}, Honempfmail: {mailingEntry.Honempfmail}");
+    
+    // Use Lzgemail if Honempfmail is empty
+    string emailToUse = !string.IsNullOrEmpty(mailingEntry.Honempfmail) 
+        ? mailingEntry.Honempfmail 
+        : mailingEntry.Lzgemail;
 
-            _logger.LogInformation($"Found {contacts.Count} contacts");
+    _logger.LogInformation($"Using email for contact search: {emailToUse}");
+    
+    var contacts = _context.bon_db_contacts
+        .Where(c => c.Honempfemail == emailToUse || c.Lzgemail == emailToUse)
+        .ToList();
+
+    _logger.LogInformation($"Found {contacts.Count} contacts for email {emailToUse}");
+
+            // Store the code in session for future visits
+            HttpContext.Session.SetString("LastAutCode", verificationCode);
 
             return View(new VerifyCodeViewModel 
             { 
                 IsAuthenticated = true,
                 AutCode = verificationCode,
-                Email = mailingEntry.Honempfmail,
+                Email = emailToUse,
                 Contacts = contacts,
                 IsAwaitingVerification = false
             });
@@ -224,7 +244,7 @@ public IActionResult VerifyCode(string? code = null, string? autCode = null)
         else
         {
             // Log the actual database values for comparison
-            var allCodes = _context.BonDbMailing
+            var allCodes = _context.bon_db_mailing
                 .Select(m => m.AutCode)
                 .ToList();
             _logger.LogInformation($"Available codes in database: {string.Join(", ", allCodes)}");
@@ -234,6 +254,31 @@ public IActionResult VerifyCode(string? code = null, string? autCode = null)
         }
     }
 
+    // If we get here and we're authenticated, something went wrong - try to recover
+    if (isAuthenticated)
+    {
+        var lastCode = HttpContext.Session.GetString("LastAutCode");
+        var mailingEntry = _context.bon_db_mailing
+            .FirstOrDefault(m => m.AutCode == lastCode);
+
+        if (mailingEntry != null)
+        {
+            var contacts = _context.bon_db_contacts
+                .Where(c => c.Honempfemail == mailingEntry.Honempfmail)
+                .ToList();
+
+            return View(new VerifyCodeViewModel 
+            { 
+                IsAuthenticated = true,
+                AutCode = lastCode,
+                Email = mailingEntry.Honempfmail,
+                Contacts = contacts,
+                IsAwaitingVerification = false
+            });
+        }
+    }
+
+    // If all else fails, show the initial form
     return View(new VerifyCodeViewModel 
     { 
         IsAuthenticated = isAuthenticated,
@@ -258,7 +303,7 @@ public IActionResult VerifyCodeSubmit(string autCode)
         var formattedCode = autCode.Replace(" ", "").Replace("-", "").Insert(4, "-").Insert(9, "-");
 
         // Find the mailing entry with the provided auth code
-        var mailingEntry = _context.BonDbMailing
+        var mailingEntry = _context.bon_db_mailing
             .FirstOrDefault(m => m.AutCode == formattedCode);
 
         if (mailingEntry == null)
@@ -267,10 +312,19 @@ public IActionResult VerifyCodeSubmit(string autCode)
             return View("VerifyCode", new VerifyCodeViewModel());
         }
 
-        // Find all contacts with matching email
-        var contacts = _context.BonDbContacts
-            .Where(c => c.Honempfemail == mailingEntry.Honempfmail)
+        // Use Lzgemail if Honempfmail is empty
+        string emailToUse = !string.IsNullOrEmpty(mailingEntry.Honempfmail) 
+            ? mailingEntry.Honempfmail 
+            : mailingEntry.Lzgemail;
+
+        _logger.LogInformation($"Using email for contact search: {emailToUse}");
+
+        // Find all contacts with matching email in either field
+        var contacts = _context.bon_db_contacts
+            .Where(c => c.Honempfemail == emailToUse || c.Lzgemail == emailToUse)
             .ToList();
+
+        _logger.LogInformation($"Found {contacts.Count} contacts for email {emailToUse}");
 
         // Set authentication status
         SetAuthenticationStatus(true);
@@ -279,7 +333,7 @@ public IActionResult VerifyCodeSubmit(string autCode)
         var viewModel = new VerifyCodeViewModel
         {
             AutCode = formattedCode,
-            Email = mailingEntry.Honempfmail,
+            Email = emailToUse,
             Contacts = contacts,
             IsAuthenticated = true,
             IsAwaitingVerification = false
@@ -311,8 +365,9 @@ public IActionResult SaveOptIn(int autCode, string email, bool optIn, string? ne
         {
             try
             {
-                var contacts = _context.BonDbContacts
-                    .Where(c => c.Honempfemail == email)
+                // Find contacts by either email field
+                var contacts = _context.bon_db_contacts
+                    .Where(c => c.Honempfemail == email || c.Lzgemail == email)
                     .ToList();
 
                 _logger.LogInformation($"Found {contacts.Count} contacts for email {email}");
@@ -323,11 +378,22 @@ public IActionResult SaveOptIn(int autCode, string email, bool optIn, string? ne
                 }
 
                 foreach (var contact in contacts)
-                {
-                    string emailToSave = !string.IsNullOrEmpty(newEmail) ? newEmail : email;
-                    contact.Honempfemail_NEU = optIn ? emailToSave : null;
-                    contact.Honempf_Opt_In = optIn ? "TRUE" : "FALSE";
-                }
+{
+    if (optIn)
+    {
+        // Always use the verified new email if it exists, otherwise keep using current email
+        contact.Honempfemail_NEU = newEmail ?? contact.Honempfemail_NEU ?? email;
+        _logger.LogInformation($"Setting new email for {contact.VtgP_Name} to: {contact.Honempfemail_NEU}");
+    }
+    else
+    {
+        contact.Honempfemail_NEU = null;
+        _logger.LogInformation($"Clearing email for {contact.VtgP_Name} due to opt-out");
+    }
+    
+    contact.Honempf_Opt_In = optIn ? "TRUE" : "FALSE";
+    _logger.LogInformation($"Updated Opt-In status for {contact.VtgP_Name} to: {contact.Honempf_Opt_In}");
+}
 
                 _context.SaveChanges();
                 transaction.Commit();
