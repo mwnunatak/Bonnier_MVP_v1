@@ -38,6 +38,265 @@ body {
   box-shadow: 0 0 0 0.1rem white, 0 0 0 0.25rem var(--bonnier-accent);
 }
 
+/* Modern icon styling */
+.icon-wrapper {
+  width: 48px;
+  height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 12px;
+  background-color: #333333;
+  color: white;
+  font-size: 1.25rem;
+  flex-shrink: 0; 
+}
+
+.icon-wrapper-sm {
+  width: 32px;
+  height: 32px;
+  font-size: 1rem;
+}
+
+/* Section styling */
+.section-divider {
+  height: 1px;
+  background: linear-gradient(to right, var(--bonnier-accent) 0%, transparent 100%);
+  opacity: 0.1;
+  margin: 2rem 0;
+}
+
+.section-content {
+  background-color: #f8f9fa;
+  border-radius: 10px;
+  padding: 1.25rem;
+}
+
+/* Contact bullet styling */
+.contact-bullet {
+  width: 6px;
+  height: 6px;
+  background-color: #333333;
+  border-radius: 50%;
+  opacity: 0.7;
+}
+
+/* Custom checkbox styling */
+.custom-checkbox-wrapper {
+  background-color: #f8f9fa;
+  border-radius: 10px;
+  padding: 1.25rem;
+  transition: all 0.2s ease;
+}
+
+.custom-checkbox-wrapper:hover {
+  background-color: #f3f4f6;
+}
+
+.custom-checkbox {
+  width: 1.5rem;
+  height: 1.5rem;
+  border-radius: 6px !important;
+  border: 2px solid #28a745 !important; 
+  cursor: pointer;
+}
+
+.custom-checkbox:checked {
+  background-color: #28a745 !important; /* Bootstrap green */
+  border-color: #28a745 !important;
+}
+
+/* Icon button styling */
+.btn-icon {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: #0d6efd; /* Bootstrap primary blue */
+  background: none;
+  border: none;
+  padding: 0.5rem;
+  border-radius: 6px;
+  transition: all 0.2s ease;
+  text-decoration: none;
+}
+
+.btn-icon:hover {
+  background-color: rgba(13, 110, 253, 0.05); /* Very light blue background on hover */
+  color: #0a58ca; /* Slightly darker blue on hover */
+}
+
+.btn-icon i {
+  font-size: 1.1rem;
+}
+
+/* Updated eco-message styling */
+.eco-message {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  background-color: #ebf9eb; /* Light green background */
+  border-radius: 12px;
+  padding: 1.25rem;
+  margin-top: 1rem;
+  border: 1px solid rgba(40, 167, 69, 0.1); /* Very subtle green border */
+}
+
+.eco-message .icon-wrapper {
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  background-color: #28a745;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.eco-message .icon-wrapper i {
+  color: white;
+  font-size: 1rem;
+}
+
+.eco-message span {
+  color: #2d712d; /* Darker green for text */
+  font-size: 0.95rem;
+  line-height: 1.5;
+}
+
+/* Update button styling to always be green */
+.btn-bonnier, 
+.btn-primary,
+#saveButton {  /* Adding specific ID to increase specificity */
+    background-color: #28a745 !important; /* Bootstrap green */
+    color: white;
+    border: none;
+    padding: 0.75rem 2rem;
+    border-radius: 8px;
+    transition: all 0.2s ease;
+    font-weight: 500;
+}
+
+.btn-bonnier:hover:not(:disabled), 
+.btn-primary:hover:not(:disabled),
+#saveButton:hover:not(:disabled) {
+    background-color: #218838 !important; /* Darker green on hover */
+    color: white;
+    transform: translateY(-1px);
+}
+
+.btn-bonnier:disabled, 
+.btn-primary:disabled,
+#saveButton:disabled {
+    background-color: #28a745 !important;
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.bullet-point {
+  width: 6px;
+  height: 6px;
+  background-color: var(--bonnier-accent);
+  border-radius: 50%;
+  display: inline-block;
+}
+
+.opt-in-container {
+  background-color: rgba(var(--bonnier-accent-rgb), 0.05);
+  border: 1px solid rgba(var(--bonnier-accent-rgb), 0.1);
+  transition: all 0.2s ease;
+}
+
+.opt-in-container:hover {
+  background-color: rgba(var(--bonnier-accent-rgb), 0.08);
+}
+
+.form-check-input:checked {
+  background-color: var(--bonnier-accent);
+  border-color: var(--bonnier-accent);
+}
+
+.gap-2 { gap: 0.5rem; }
+.gap-3 { gap: 1rem; }
+
+.bg-opacity-10 {
+  opacity: 0.1;
+}
+
+.verification-success-card {
+  background: linear-gradient(to bottom right, var(--bonnier-light), var(--bonnier-gray));
+  border-radius: 12px;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+  margin-top: 2rem;
+}
+
+.section-divider {
+  height: 1px;
+  background: linear-gradient(to right, var(--bonnier-gray), transparent);
+  margin: 1.5rem 0;
+}
+
+.info-section {
+  padding: 1.5rem 0;
+}
+
+.info-header {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+
+.info-icon {
+  width: 24px;
+  height: 24px;
+  color: var(--bonnier-accent);
+}
+
+.recipients-list {
+  list-style: none;
+  padding: 0;
+  margin: 1rem 0;
+}
+
+.recipients-list li {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 0;
+}
+
+.recipient-bullet {
+  width: 6px;
+  height: 6px;
+  background-color: var(--bonnier-accent);
+  border-radius: 50%;
+}
+
+.email-section {
+  background-color: var(--bonnier-gray);
+  border-radius: 8px;
+  padding: 1rem;
+  margin: 1rem 0;
+}
+
+.opt-in-section {
+  background-color: #e8f5e9;
+  border: 1px solid #c8e6c9;
+  border-radius: 8px;
+  padding: 1.5rem;
+  margin: 1.5rem 0;
+  transition: all 0.3s ease;
+}
+
+.opt-in-section:hover {
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+}
+
+.security-container {
+  margin-top: 120px; /* Adjust this value based on your header height */
+  padding: 20px;
+}
+
 /* Modern Navigation */
 .navbar {
   background-image: url('../images/bonnier_header.jpg');

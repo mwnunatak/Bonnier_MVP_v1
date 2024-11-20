@@ -6,6 +6,8 @@ using BonPortalBackend.Extensions;
 using BonPortalBackend.Services;
 using System.Linq;
 using Microsoft.AspNetCore.Http;
+using BonPortalBackend.Utils;
+
 
 
 namespace BonPortalBackend.Controllers
@@ -105,68 +107,90 @@ public async Task<IActionResult> VerifyNewEmail(string newEmail, string currentE
 
         // Log all verification entries for this email
         var allVerificationEntries = await _context.bon_db_verificationcodes
-            .Where(v => v.Initial_Mail == currentEmail)
+            .Where(v => v.Initial_Mail == currentEmail && v.New_Mail == newEmail)
             .OrderByDescending(v => v.CreatedAt)
             .ToListAsync();
 
         _logger.LogInformation($"Found {allVerificationEntries.Count} verification entries for {currentEmail}");
-        foreach (var entry in allVerificationEntries)
+        
+        // Get the most recent verification entry regardless of the code
+        var mostRecentEntry = allVerificationEntries.FirstOrDefault();
+        
+        if (mostRecentEntry != null)
         {
-            _logger.LogInformation($"Verification Entry - ID: {entry.Id}, Initial: {entry.Initial_Mail}, " +
-                                 $"New: {entry.New_Mail}, Code: {entry.New_Auth_Code}, " +
-                                 $"Success: {entry.Auth_Success}, Created: {entry.CreatedAt}");
-        }
-
-        // Find the most recent verification entry with matching code
-        var verificationEntry = await _context.bon_db_verificationcodes
-            .Where(v => v.Initial_Mail == currentEmail 
-                    && v.New_Auth_Code == parsedCode
-                    && !v.Auth_Success)
-            .OrderByDescending(v => v.CreatedAt)
-            .FirstOrDefaultAsync();
-
-        if (verificationEntry == null)
-        {
-            _logger.LogWarning($"No matching verification entry found for code: {parsedCode}");
+            _logger.LogInformation($"Most recent verification code: {mostRecentEntry.New_Auth_Code}, Submitted code: {parsedCode}");
             
-            // Try to find why it didn't match
-            var lastEntry = allVerificationEntries.FirstOrDefault();
-            if (lastEntry != null)
+            if (mostRecentEntry.New_Auth_Code == parsedCode)
             {
-                _logger.LogInformation($"Last verification entry - Code: {lastEntry.New_Auth_Code}, " +
-                                     $"Matches provided code: {lastEntry.New_Auth_Code == parsedCode}, " +
-                                     $"Already verified: {lastEntry.Auth_Success}");
+                if (mostRecentEntry.Auth_Success)
+                {
+                    return Json(new { success = false, message = "Dieser Code wurde bereits verwendet." });
+                }
+
+                // Update verification status
+                mostRecentEntry.Auth_Success = true;
+                await _context.SaveChangesAsync();
+
+                // Update the email in contacts and create safety records
+                var contacts = await _context.bon_db_contacts
+                    .Where(c => c.Honempfemail == currentEmail || c.Lzgemail == currentEmail)
+                    .ToListAsync();
+
+                _logger.LogInformation($"Found {contacts.Count} contacts to update with new email");
+
+                foreach (var contact in contacts)
+                {
+                    // Store original email before updating
+                    string safetyToken = SafetyLinkGenerator.GenerateSafetyLink();
+                    string fullSafetyLink = SafetyLinkGenerator.GetFullSafetyLink(Request, safetyToken);
+
+                    // Create recovery record
+                    var recoveryRecord = new BonDbRecoveries
+                    {
+                        Lzgemail = contact.Lzgemail,
+                        Honempfemail = contact.Honempfemail,
+                        Honempfemail_NEW = newEmail,
+                        SafetyLink = safetyToken,
+                        SafetyRequest = "FALSE"
+                    };
+                    
+                    _context.bon_db_recoveries.Add(recoveryRecord);
+                    
+                    // Update contact with new email
+                    contact.Honempfemail_NEU = newEmail;
+                    _logger.LogInformation($"Updating contact {contact.VtgP_Name} with new email: {newEmail}");
+
+                    // Send notification emails to both old addresses if they exist and are different
+                    if (!string.IsNullOrEmpty(contact.Lzgemail))
+                    {
+                        await _emailService.SendEmailChangeNotificationAsync(contact.Lzgemail, newEmail, fullSafetyLink);
+                    }
+                    
+                    if (!string.IsNullOrEmpty(contact.Honempfemail) && contact.Honempfemail != contact.Lzgemail)
+                    {
+                        await _emailService.SendEmailChangeNotificationAsync(contact.Honempfemail, newEmail, fullSafetyLink);
+                    }
+                }
+
+                await _context.SaveChangesAsync();
+                _logger.LogInformation($"Email verification completed successfully");
+
+                return Json(new { 
+                    success = true,
+                    message = "E-Mail-Adresse wurde erfolgreich verifiziert."
+                });
             }
-            
-            return Json(new { success = false, message = "Falscher Code" });
+            else
+            {
+                _logger.LogWarning($"Code mismatch - Expected: {mostRecentEntry.New_Auth_Code}, Received: {parsedCode}");
+                return Json(new { success = false, message = "Falscher Code" });
+            }
         }
-
-        _logger.LogInformation($"Found matching verification entry. Updating status...");
-
-        // Update verification status
-        verificationEntry.Auth_Success = true;
-        await _context.SaveChangesAsync();
-
-        // Update the email in contacts - check both email fields
-var contacts = await _context.bon_db_contacts
-    .Where(c => c.Honempfemail == currentEmail || c.Lzgemail == currentEmail)
-    .ToListAsync();
-
-_logger.LogInformation($"Found {contacts.Count} contacts to update with new email");
-
-foreach (var contact in contacts)
-{
-    contact.Honempfemail_NEU = newEmail;  // Use newEmail directly since it's already verified
-    _logger.LogInformation($"Updating contact {contact.VtgP_Name} with new email: {newEmail}");
-}
-
-        await _context.SaveChangesAsync();
-        _logger.LogInformation($"Email verification completed successfully");
-
-        return Json(new { 
-            success = true,
-            message = "E-Mail-Adresse wurde erfolgreich verifiziert."
-        });
+        else
+        {
+            _logger.LogWarning("No verification entries found");
+            return Json(new { success = false, message = "Keine Verifizierung ausstehend" });
+        }
     }
     catch (Exception ex)
     {
@@ -179,61 +203,83 @@ foreach (var contact in contacts)
     }
 }
 
-[HttpGet]
-public IActionResult VerifyCode(string? code = null, string? autCode = null)
-{
-    // If code is provided in URL, use that as the autCode
-    string? verificationCode = code ?? autCode;
-    
-    _logger.LogInformation($"Initial verification code from URL: {verificationCode}");
 
+[HttpGet]
+public async Task<IActionResult> HandleSafetyRequest(string token)
+{
+    try
+    {
+        var recovery = await _context.bon_db_recoveries
+            .FirstOrDefaultAsync(r => r.SafetyLink == token);
+
+        if (recovery == null)
+        {
+            return View("Error", new ErrorViewModel { ErrorMessage = "Ungültiger oder abgelaufener Sicherheitslink." });
+        }
+
+        if (recovery.SafetyRequest == "TRUE")
+        {
+            return View("SafetyRequest", new { Message = "Diese Sicherheitsanfrage wurde bereits bearbeitet." });
+        }
+
+        // Update the recovery record
+        recovery.SafetyRequest = "TRUE";
+        await _context.SaveChangesAsync();
+
+        // Return the safety request view
+        return View("SafetyRequest", new { Message = "Wir haben registriert, dass Sie ihre E-Mail nicht geändert haben. Der Vorgang wird gesperrt und Sie erhalten Ihre Abrechnung weiterhin analog." });
+    }
+    catch (Exception ex)
+    {
+        _logger.LogError($"Error handling safety request: {ex.Message}");
+        return View("Error", new ErrorViewModel { ErrorMessage = "Ein Fehler ist aufgetreten." });
+    }
+}
+
+[HttpGet]
+public IActionResult VerifyCode(string? q = null)
+{
+    string? verificationCode = null;
     var isAuthenticated = HttpContext.Session.GetBool(AuthenticationSessionKey) ?? false;
-    
-    // If already authenticated and no new code provided, try to get the last used code
-    if (isAuthenticated && string.IsNullOrEmpty(verificationCode))
+
+    if (!string.IsNullOrEmpty(q))
+    {
+        verificationCode = VerificationCodeEncoder.DecodeVerificationCode(q);
+        _logger.LogInformation($"Decoded verification code from q parameter: {verificationCode}");
+    }
+    else if (isAuthenticated)
     {
         verificationCode = HttpContext.Session.GetString("LastAutCode");
         _logger.LogInformation($"Retrieved last auth code from session: {verificationCode}");
     }
 
-    // If there's a code (either from URL or session), process it
     if (!string.IsNullOrEmpty(verificationCode))
     {
-        // Format the code if it doesn't have dashes
         if (!verificationCode.Contains("-") && verificationCode.Length == 12)
         {
             verificationCode = $"{verificationCode.Substring(0, 4)}-{verificationCode.Substring(4, 4)}-{verificationCode.Substring(8, 4)}";
         }
-        ViewData["PrefilledCode"] = verificationCode;
         _logger.LogInformation($"Formatted verification code: {verificationCode}");
 
-        // Try to find the mailing entry
+
         var mailingEntry = _context.bon_db_mailing
             .FirstOrDefault(m => m.AutCode == verificationCode);
 
         _logger.LogInformation($"Database lookup result: {(mailingEntry != null ? "Found" : "Not Found")}");
         if (mailingEntry != null)
-{
-    _logger.LogInformation($"Found mailing entry with Lzgemail: {mailingEntry.Lzgemail}, Honempfmail: {mailingEntry.Honempfmail}");
-    
-    // Use Lzgemail if Honempfmail is empty
-    string emailToUse = !string.IsNullOrEmpty(mailingEntry.Honempfmail) 
-        ? mailingEntry.Honempfmail 
-        : mailingEntry.Lzgemail;
+        {
+            string emailToUse = !string.IsNullOrEmpty(mailingEntry.Honempfmail)
+                ? mailingEntry.Honempfmail
+                : mailingEntry.Lzgemail;
 
-    _logger.LogInformation($"Using email for contact search: {emailToUse}");
-    
-    var contacts = _context.bon_db_contacts
-        .Where(c => c.Honempfemail == emailToUse || c.Lzgemail == emailToUse)
-        .ToList();
+            var contacts = _context.bon_db_contacts
+                .Where(c => c.Honempfemail == emailToUse || c.Lzgemail == emailToUse)
+                .ToList();
 
-    _logger.LogInformation($"Found {contacts.Count} contacts for email {emailToUse}");
-
-            // Store the code in session for future visits
             HttpContext.Session.SetString("LastAutCode", verificationCode);
-
-            return View(new VerifyCodeViewModel 
-            { 
+            
+            return View(new VerifyCodeViewModel
+            {
                 IsAuthenticated = true,
                 AutCode = verificationCode,
                 Email = emailToUse,
@@ -243,18 +289,10 @@ public IActionResult VerifyCode(string? code = null, string? autCode = null)
         }
         else
         {
-            // Log the actual database values for comparison
-            var allCodes = _context.bon_db_mailing
-                .Select(m => m.AutCode)
-                .ToList();
-            _logger.LogInformation($"Available codes in database: {string.Join(", ", allCodes)}");
-            
             ViewData["NotFound"] = true;
-            _logger.LogWarning($"No mailing entry found for code: {verificationCode}");
         }
     }
 
-    // If we get here and we're authenticated, something went wrong - try to recover
     if (isAuthenticated)
     {
         var lastCode = HttpContext.Session.GetString("LastAutCode");
@@ -267,8 +305,8 @@ public IActionResult VerifyCode(string? code = null, string? autCode = null)
                 .Where(c => c.Honempfemail == mailingEntry.Honempfmail)
                 .ToList();
 
-            return View(new VerifyCodeViewModel 
-            { 
+            return View(new VerifyCodeViewModel
+            {
                 IsAuthenticated = true,
                 AutCode = lastCode,
                 Email = mailingEntry.Honempfmail,
@@ -278,9 +316,8 @@ public IActionResult VerifyCode(string? code = null, string? autCode = null)
         }
     }
 
-    // If all else fails, show the initial form
-    return View(new VerifyCodeViewModel 
-    { 
+    return View(new VerifyCodeViewModel
+    {
         IsAuthenticated = isAuthenticated,
         IsAwaitingVerification = false
     });
