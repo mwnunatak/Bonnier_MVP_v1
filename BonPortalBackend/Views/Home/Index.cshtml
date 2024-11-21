@@ -3,6 +3,43 @@
 }
 
 <div class="hero-section">
-    <h1 class="hero-title">WELCOME!</h1>
-    <p class="hero-subtitle">This is going to be the welcome site</p>
+    <div class="container">
+        <div class="row justify-content-center">
+            <div class="col-md-8">
+                <h1 class="display-1 mb-3">Willkommen</h1>
+                <p class="lead mb-5">im neuen Author-Portal von Bonnier</p>
+
+                <!-- Digital Services Point -->
+                <div class="d-flex align-items-center gap-3 mb-4">
+                    <div class="icon-wrapper">
+                        <i class="bi bi-gear-fill"></i>
+                    </div>
+                    <p class="mb-0 fs-5 text-start">Hier entstehen digitale Services für Sie! <br/> Ab sofort ist der digitale Abrechnungsversand verfügbar. </p>
+                </div>
+
+                <!-- Digital Receipts Point -->
+                <div class="d-flex align-items-start gap-3 mb-4">
+                    <div class="icon-wrapper">
+                        <i class="bi bi-envelope-fill"></i>
+                    </div>
+                    <p class="mb-0 fs-5 text-start">Wenn dies für Sie zur Verfühung steht, sollten Sie sollten bereits eine E-Mail dazu erhalten haben.</p>
+                </div>
+
+                <!-- Contact Point -->
+                <div class="d-flex align-items-center gap-3 mb-5">
+                    <div class="icon-wrapper">
+                        <i class="bi bi-question-circle-fill"></i>
+                    </div>
+                    <p class="mb-0 fs-5 text-start">Bei Fragen kontaktieren Sie uns gerne bei Bonnier.</p>
+                </div>
+
+                <!-- Authentication Button -->
+                <div class="text-center">
+                    <a class="btn btn-success btn-lg px-4" asp-controller="ContactInformation" asp-action="VerifyCode">
+                        <i class="bi bi-arrow-right-circle me-2"></i>ZUR AUTHENTIFIZIERUNG
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
 </div>
