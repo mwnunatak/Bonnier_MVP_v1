@@ -187,6 +187,33 @@
     </div>
 </div>
 
+<template id="email-verification-feedback">
+  <div class="verification-success mt-3 p-3 border rounded bg-light">
+  <style>
+    .verification-success {
+      background-color: #f8f9fa;
+      border-color: #28a745 !important;
+      transition: all 0.3s ease;
+    }
+    .verification-icon {
+      color: #28a745;
+      font-size: 1.2rem;
+      margin-right: 0.5rem;
+    }
+    .new-email-label {
+      font-weight: 500;
+      color: #333;
+      margin-right: 0.5rem;
+    }
+  </style>
+  <div class="d-flex align-items-center">
+    <i class="bi bi-check-circle-fill verification-icon"></i>
+    <span class="new-email-label">Neue E-Mail:</span>
+    <span class="new-email-value"></span>
+  </div>
+</div>
+</template>
+
 <!-- Email Verification Modal -->
 <div class="modal fade" id="emailVerificationModal" tabindex="-1" aria-labelledby="emailVerificationModalLabel" aria-hidden="true">
     <div class="modal-dialog">
@@ -496,25 +523,37 @@ async function submitVerificationCode(event) {
     const verificationError = document.getElementById('verificationError');
     const submitButton = form.querySelector('button[type="submit"]');
     
+    // Show loading state on button
+    submitButton.disabled = true;
+    const originalButtonText = submitButton.innerHTML;
+    submitButton.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Verifizierung läuft...';
+    
     try {
-        submitButton.disabled = true;
-        
         const response = await fetch('@Url.Action("VerifyNewEmail", "ContactInformation")', {
             method: 'POST',
             body: formData
         });
-        
         const data = await response.json();
         
         if (data.success) {
-            // Hide error message if it was shown
+            // Hide error message
             verificationError.style.display = 'none';
             
+            const emailDisplayContainer = document.querySelector('.section-content .d-flex.justify-content-between').parentElement;
+            const feedback = document.createElement('div');
+            feedback.className = 'mt-3';
+            feedback.innerHTML = document.querySelector('#email-verification-feedback').innerHTML;
+            feedback.querySelector('.new-email-value').textContent = formData.get('newEmail');
+            const currentEmailDisplay = emailDisplayContainer.querySelector('.d-flex.justify-content-between');
+            currentEmailDisplay.insertAdjacentElement('afterend', feedback);
+        
+
             // Close modal
             const modal = bootstrap.Modal.getInstance(document.getElementById('emailVerificationModal'));
             modal.hide();
             
-            // Add the new verified email display
+            // After modal is hidden, update UI and add verified email display
+            document.getElementById('emailChangeSection').style.display = 'none';
             addVerifiedEmailDisplay(formData.get('newEmail'));
             
             // Show success message
@@ -525,30 +564,23 @@ async function submitVerificationCode(event) {
                 <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
             `;
             
-            // Insert success message at the top of the verification container
             const container = document.querySelector('.verification-container');
             container.insertBefore(successAlert, container.firstChild);
             
-            // Reset and hide the email change form
-            const emailChangeSection = document.getElementById('emailChangeSection');
-            if (emailChangeSection) {
-                emailChangeSection.style.display = 'none';
-            }
-
-            // Update save button state - Add this line
             updateSaveButton();
-            
         } else {
             // Show error message in modal
             verificationError.textContent = data.message;
             verificationError.style.display = 'block';
             submitButton.disabled = false;
+            submitButton.innerHTML = originalButtonText;
         }
     } catch (error) {
         console.error('Error:', error);
         verificationError.textContent = 'Ein Fehler ist aufgetreten. Bitte versuchen Sie es später erneut.';
         verificationError.style.display = 'block';
         submitButton.disabled = false;
+        submitButton.innerHTML = originalButtonText;
     }
 }
 
