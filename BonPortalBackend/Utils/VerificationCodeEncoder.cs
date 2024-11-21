@@ -60,5 +60,76 @@ namespace BonPortalBackend.Utils
                 return string.Empty;
             }
         }
+
+        public static bool ValidateChecksum(string code)
+        {
+            // Remove dashes and validate format
+            code = code.Replace("-", "");
+            if (code.Length != 12)
+                return false;
+
+            // Extract checksum (positions 1 and 4 in the original format)
+            string expectedChecksum = $"{code[1]}{code[4]}";
+            
+            // Create string without checksum digits for calculation
+            string codeWithoutChecksum = 
+                code.Substring(0, 1) +
+                code.Substring(2, 2) +
+                code.Substring(5, 7);
+
+            // Calculate actual checksum
+            int sum = 0;
+            foreach (char c in codeWithoutChecksum)
+            {
+                if (char.IsLetter(c))
+                    sum += (char.ToUpper(c) - 'A' + 1);
+                else if (char.IsDigit(c))
+                    sum += (c - '0');
+            }
+
+            // Get last two digits of sum
+            string actualChecksum = (sum % 100).ToString("D2");
+            
+            return expectedChecksum == actualChecksum;
+        }
+
+        public static string GenerateChecksum(string partialCode)
+        {
+            // Remove any existing dashes
+            partialCode = partialCode.Replace("-", "");
+            
+            // Calculate sum
+            int sum = 0;
+            foreach (char c in partialCode)
+            {
+                if (char.IsLetter(c))
+                    sum += (char.ToUpper(c) - 'A' + 1);
+                else if (char.IsDigit(c))
+                    sum += (c - '0');
+            }
+            
+            return (sum % 100).ToString("D2");
+        }
+
+        public static bool ValidateFormat(string code)
+        {
+            // Remove dashes first
+            code = code.Replace("-", "");
+            
+            // Check length
+            if (code.Length != 12)
+                return false;
+
+            // Check if all characters are either letters or digits
+            foreach (char c in code)
+            {
+                if (!char.IsLetterOrDigit(c))
+                    return false;
+                if (char.IsLetter(c) && !char.IsUpper(c))
+                    return false;
+            }
+
+            return true;
+        }
     }
 }

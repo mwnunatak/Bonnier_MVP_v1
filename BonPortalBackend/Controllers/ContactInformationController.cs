@@ -246,6 +246,21 @@ public IActionResult VerifyCode(string? q = null)
     {
         verificationCode = VerificationCodeEncoder.DecodeVerificationCode(q);
         _logger.LogInformation($"Decoded verification code from q parameter: {verificationCode}");
+        
+        // Validate format and checksum for decoded URL parameter
+        if (!VerificationCodeEncoder.ValidateFormat(verificationCode))
+        {
+            _logger.LogWarning($"Invalid code format: {verificationCode}");
+            ViewData["Error"] = "Ungültiges Code-Format.";
+            return View(new VerifyCodeViewModel());
+        }
+        
+        if (!VerificationCodeEncoder.ValidateChecksum(verificationCode))
+        {
+            _logger.LogWarning($"Invalid checksum for code: {verificationCode}");
+            ViewData["Error"] = "Ungültiger Code.";
+            return View(new VerifyCodeViewModel());
+        }
     }
     else if (isAuthenticated)
     {
@@ -260,7 +275,6 @@ public IActionResult VerifyCode(string? q = null)
             verificationCode = $"{verificationCode.Substring(0, 4)}-{verificationCode.Substring(4, 4)}-{verificationCode.Substring(8, 4)}";
         }
         _logger.LogInformation($"Formatted verification code: {verificationCode}");
-
 
         var mailingEntry = _context.bon_db_mailing
             .FirstOrDefault(m => m.AutCode == verificationCode);
@@ -332,12 +346,31 @@ public IActionResult VerifyCodeSubmit(string autCode)
 
         if (string.IsNullOrEmpty(autCode))
         {
-            ViewData["NotFound"] = true;
+            ViewData["Error"] = "Bitte geben Sie einen Code ein.";
             return View("VerifyCode", new VerifyCodeViewModel());
         }
 
-        // Clean up the input code if needed (in case user enters without dashes)
-        var formattedCode = autCode.Replace(" ", "").Replace("-", "").Insert(4, "-").Insert(9, "-");
+        // Clean up the input code
+        var formattedCode = autCode.Replace(" ", "").Replace("-", "");
+        
+        // Validate format first
+        if (!VerificationCodeEncoder.ValidateFormat(formattedCode))
+        {
+            _logger.LogWarning($"Invalid code format: {formattedCode}");
+            ViewData["Error"] = "Ungültiges Code-Format.";
+            return View("VerifyCode", new VerifyCodeViewModel());
+        }
+        
+        // Validate checksum
+        if (!VerificationCodeEncoder.ValidateChecksum(formattedCode))
+        {
+            _logger.LogWarning($"Invalid checksum for code: {formattedCode}");
+            ViewData["Error"] = "Ungültiger Code.";
+            return View("VerifyCode", new VerifyCodeViewModel());
+        }
+        
+        // Add dashes for database lookup
+        formattedCode = formattedCode.Insert(4, "-").Insert(9, "-");
 
         // Find the mailing entry with the provided auth code
         var mailingEntry = _context.bon_db_mailing
@@ -382,7 +415,8 @@ public IActionResult VerifyCodeSubmit(string autCode)
     {
         _logger.LogError($"Error verifying code: {ex.Message}");
         _logger.LogError($"Stack trace: {ex.StackTrace}");
-        throw;
+        ViewData["Error"] = "Ein Fehler ist aufgetreten.";
+        return View("VerifyCode", new VerifyCodeViewModel());
     }
 }
 
