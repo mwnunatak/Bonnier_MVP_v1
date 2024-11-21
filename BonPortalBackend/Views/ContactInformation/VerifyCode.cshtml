@@ -36,15 +36,16 @@
                 <div class="form-group">
                     <label for="autCode" class="form-label">Geben Sie den Authentifizierungscode aus der E-Mail / Brief ein:</label>
                     <input type="text"
-                        class="form-control verification-input"
-                        id="autCode"
-                        name="autCode"
-                        required
-                        pattern="[A-Z0-9]{4}-[A-Z0-9]{4}-[A-Z0-9]{4}"
-                        placeholder="XXXX-XXXX-XXXX"
-                        style="text-transform: uppercase;"
-                        maxlength="14"
-                        value="@ViewData["PrefilledCode"]" />
+    class="form-control verification-input"
+    id="autCode"
+    name="autCode"
+    required
+    pattern="[A-Z0-9]{4}-[A-Z0-9]{4}-[A-Z0-9]{4}"
+    placeholder="XXXX-XXXX-XXXX"
+    style="text-transform: uppercase;"
+    maxlength="14"
+    autocomplete="off"
+    value="@ViewData["PrefilledCode"]" />
                 </div>
                 <button type="submit" class="btn btn-primary mt-4">Bestätigen</button>
             </form>
@@ -364,6 +365,40 @@ function startTimer() {
                 });
             }
         });
+
+        document.addEventListener('DOMContentLoaded', function() {
+    const autCodeInput = document.getElementById('autCode');
+    
+    if (autCodeInput) {
+        autCodeInput.addEventListener('input', function(e) {
+            // Remove any non-alphanumeric characters
+            let value = e.target.value.replace(/[^A-Za-z0-9]/g, '').toUpperCase();
+            
+            // Add dashes after every 4 characters
+            if (value.length > 4) {
+                value = value.slice(0, 4) + '-' + value.slice(4);
+            }
+            if (value.length > 9) {
+                value = value.slice(0, 9) + '-' + value.slice(9);
+            }
+            
+            // Limit to 12 characters (plus 2 dashes = 14 total)
+            value = value.slice(0, 14);
+            
+            // Update input value
+            e.target.value = value;
+        });
+
+        // Prevent dash key from being entered manually
+        autCodeInput.addEventListener('keydown', function(e) {
+            if (e.key === '-') {
+                e.preventDefault();
+            }
+        });
+    }
+});
+
+
     </script>
 }
 
