@@ -6,8 +6,6 @@ using Microsoft.Extensions.Configuration;
 using System.IO;
 using DotNetEnv;
 
-
-
 // Load .env file at the start
 DotNetEnv.Env.Load();
 
@@ -28,10 +26,13 @@ builder.Configuration
     .AddJsonFile($"appsettings.{builder.Environment.EnvironmentName}.json", optional: true)
     .AddEnvironmentVariables();  // This will include the .env variables
 
+// Add HttpContextAccessor
+builder.Services.AddHttpContextAccessor();
+
 // Add services to the container
 builder.Services.AddControllersWithViews();
 
-// Register EmailService with configuration
+// Register EmailService with configuration and HttpContextAccessor (single registration)
 builder.Services.AddScoped<IEmailService>(sp =>
 {
     var logger = sp.GetRequiredService<ILogger<EmailService>>();
@@ -39,7 +40,8 @@ builder.Services.AddScoped<IEmailService>(sp =>
         .AddConfiguration(builder.Configuration)
         .AddEnvironmentVariables()
         .Build();
-    return new EmailService(configuration, logger);
+    var httpContextAccessor = sp.GetRequiredService<IHttpContextAccessor>();
+    return new EmailService(configuration, logger, httpContextAccessor);
 });
 
 // Register DbContext
@@ -52,10 +54,9 @@ builder.Services.AddSession(options =>
     options.IdleTimeout = TimeSpan.FromMinutes(30);
     options.Cookie.HttpOnly = true;
     options.Cookie.IsEssential = true;
-    options.Cookie.SecurePolicy = CookieSecurePolicy.Always; // Add this line
-    options.Cookie.SameSite = SameSiteMode.Lax; // Add this line
+    options.Cookie.SecurePolicy = CookieSecurePolicy.Always;
+    options.Cookie.SameSite = SameSiteMode.Lax;
 });
-
 
 var app = builder.Build();
 
@@ -85,7 +86,7 @@ if (app.Environment.IsDevelopment())
     {
         var emailConfig = new
         {
-            ConnectionString = configuration["AZURE_COMMUNICATION_CONNECTION_STRING"]?.Substring(0, 20) + "...", // Only show beginning for security
+            ConnectionString = configuration["AZURE_COMMUNICATION_CONNECTION_STRING"]?.Substring(0, 20) + "...",
             SenderEmail = configuration["AZURE_COMMUNICATION_SENDER_EMAIL"]
         };
         return Results.Ok(emailConfig);
